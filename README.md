@@ -25,3 +25,18 @@ Perform these steps on a fresh Windows device during the initial setup screen.
 
 ```cmd
 curl -L -o setup.ps1 https://raw.githubusercontent.com/carloscondack/ps7-hwid/main/intune-upload.ps1 && powershell -ExecutionPolicy Bypass -File setup.ps1
+
+
+
+## 🔍 Under the Hood
+This script acts as a wrapper to execute the **official Microsoft Hardware ID upload process** in a modern authentication environment.
+
+It follows the guidelines listed in Microsoft's documentation: [**Manually register devices with Windows Autopilot**](https://learn.microsoft.com/en-us/autopilot/add-devices).
+
+Once PowerShell 7 is installed, the script executes the following standard commands inside the secure session:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+Install-Script -Name Get-WindowsAutopilotInfo -Force
+Get-WindowsAutopilotInfo -Online
