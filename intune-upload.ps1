@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Bootstrap script for Intune Autopilot Enrollment via PowerShell 7.
-    Version 2.0 - Fixes PATH issues on re-runs.
+    Version 3.0 - Fixes Variable Expansion bug using literal strings.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -36,8 +36,9 @@ if (-not (Test-Path $PwshPath)) {
 # --- 3. Create the Payload Script for PS7 ---
 $PayloadFile = "$env:TEMP\IntuneEnrollment.ps1"
 
-# NOTE: The logic below now finds the specific path of the script to avoid PATH errors
-$PayloadContent = @"
+# IMPORTANT: We use Single Quotes (@') here to prevent PowerShell 5 from 
+# erasing the variables inside the block before writing the file.
+$PayloadContent = @'
 Write-Host "[-] Configuring PowerShell 7 Environment..." -ForegroundColor Green
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
@@ -60,14 +61,18 @@ if (-not $ScriptInfo) {
 
 # 3. Execution (Using Full Path)
 # We construct the full path to ensure it runs even if the PATH var isn't updated in this session
-$ScriptPath = "`$($ScriptInfo.InstalledLocation)\$ScriptName.ps1"
+if ($ScriptInfo) {
+    $ScriptPath = "$($ScriptInfo.InstalledLocation)\$ScriptName.ps1"
 
-Write-Host "[-] Starting Authentication (Phishing Resistant)..." -ForegroundColor Yellow
-Write-Host "    A browser window will open shortly." -ForegroundColor Gray
-Write-Host "    Running: `$ScriptPath" -ForegroundColor DarkGray
-
-& `$ScriptPath -Online
-"@
+    Write-Host "[-] Starting Authentication (Phishing Resistant)..." -ForegroundColor Yellow
+    Write-Host "    A browser window will open shortly." -ForegroundColor Gray
+    
+    & $ScriptPath -Online
+}
+else {
+    Write-Error "Failed to locate the Autopilot script after installation."
+}
+'@
 
 Set-Content -Path $PayloadFile -Value $PayloadContent
 
