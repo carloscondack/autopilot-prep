@@ -11,8 +11,8 @@ In high-security tenants, standard PowerShell-based enrollment methods often fai
 ## ✅ The Solution
 This script automates the transition to a modern authentication stack by:
 1.  **Downloading and installing PowerShell 7 (Core)** on the fly.
-2.  Setting the correct TLS 1.2 security protocols.
-3.  Handing off the enrollment process to PowerShell 7, which natively supports modern web authentication (including FIDO2/YubiKeys).
+2.  **Verifying Integrity:** Automatically checks the SHA256 hash of the downloaded MSI against official GitHub records to prevent tampering.
+3.  **Handing off** the enrollment process to PowerShell 7, which natively supports modern web authentication (including FIDO2/YubiKeys).
 
 ## 🚀 Usage (OOBE)
 
@@ -24,4 +24,4 @@ Perform these steps on a fresh Windows device during the initial setup screen.
 4.  Run the following "One-Liner" command:
 
 ```cmd
-curl -L -o setup.ps1 [https://raw.githubusercontent.com/carloscondack/autopilot-prep/main/IntuneBootstrap.ps1](https://raw.githubusercontent.com/carloscondack/autopilot-prep/main/IntuneBootstrap.ps1) && powershell -ExecutionPolicy Bypass -File setup.ps1
+curl -L -o setup.ps1 https://raw.githubusercontent.com/carloscondack/autopilot-prep/main/intune-upload.ps1 && powershell -ExecutionPolicy Bypass -File setup.ps1
