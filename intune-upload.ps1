@@ -1,10 +1,12 @@
 <#
 .SYNOPSIS
     Bootstrap script for Intune Autopilot Enrollment via PowerShell 7.
-    Version 6.0 - Uses direct API "digest" for SHA256 verification (No extra downloads).
+    Version 7.0 - Simplified API Hash Extraction & Version Output.
 #>
 
 $ErrorActionPreference = "Stop"
+
+Write-Host "[-] Starting IntuneBootstrap v7.0..." -ForegroundColor Magenta
 
 # --- 1. TLS Setup ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -23,10 +25,11 @@ if (-not (Test-Path $PwshPath)) {
         $MsiAsset = $LatestRelease.assets | Where-Object { $_.name -like "*-win-x64.msi" } | Select-Object -First 1
         if (-not $MsiAsset) { throw "Could not find MSI asset in latest release." }
 
-        # 2. Extract Hash from API Metadata (New Method)
-        # The API provides "digest": "sha256:84a3..."
-        if ($MsiAsset.digest -match "sha256:(.*)") {
-            $ExpectedHash = $Matches[1]
+        # 2. Extract Hash from API Metadata (Simplified)
+        # We split "sha256:84a3..." by the colon and take the last part.
+        if ($MsiAsset.digest) {
+            $ExpectedHash = $MsiAsset.digest.Split(':')[-1]
+            Write-Host "    Found Digest: $ExpectedHash" -ForegroundColor DarkGray
         }
         else {
             Write-Warning "API did not return a SHA256 digest. Skipping security check."
