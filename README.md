@@ -24,4 +24,4 @@ Perform these steps on a fresh Windows device during the initial setup screen.
 4.  Run the following "One-Liner" command:
 
 ```cmd
-curl -L -o setup.ps1 https://raw.githubusercontent.com/carloscondack/autopilot-prep/main/intune-upload.ps1 && powershell -ExecutionPolicy Bypass -File setup.ps1
+curl -L -o setup.ps1 https://raw.githubusercontent.com/carloscondack/ps7-hwid/main/intune-upload.ps1 && powershell -ExecutionPolicy Bypass -File setup.ps1
