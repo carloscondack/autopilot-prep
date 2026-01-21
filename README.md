@@ -25,7 +25,7 @@ Perform these steps on a fresh Windows device during the initial setup screen.
 
 ```cmd
 curl -L -o setup.ps1 https://raw.githubusercontent.com/carloscondack/ps7-hwid/main/intune-upload.ps1 && powershell -ExecutionPolicy Bypass -File setup.ps1
-
+```
 
 
 ## 🔍 Under the Hood
@@ -40,3 +40,4 @@ Once PowerShell 7 is installed, the script executes the following standard comma
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 Install-Script -Name Get-WindowsAutopilotInfo -Force
 Get-WindowsAutopilotInfo -Online
+```
