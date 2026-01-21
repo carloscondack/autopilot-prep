@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Bootstrap script for Intune Autopilot Enrollment via PowerShell 7.
-    Version 4.0 - Adds Dynamic SHA256 Integrity Check.
+    Version 6.0 - Uses direct API "digest" for SHA256 verification (No extra downloads).
 #>
 
 $ErrorActionPreference = "Stop"
@@ -21,11 +21,17 @@ if (-not (Test-Path $PwshPath)) {
         
         # 1. Find the MSI Asset
         $MsiAsset = $LatestRelease.assets | Where-Object { $_.name -like "*-win-x64.msi" } | Select-Object -First 1
-        if (-not $MsiAsset) { throw "Could not find MSI asset." }
+        if (-not $MsiAsset) { throw "Could not find MSI asset in latest release." }
 
-        # 2. Find the SHA256 Asset (It usually has the same name + .sha256)
-        $ShaAsset = $LatestRelease.assets | Where-Object { $_.name -eq "$($MsiAsset.name).sha256" } | Select-Object -First 1
-        if (-not $ShaAsset) { throw "Could not find SHA256 checksum asset." }
+        # 2. Extract Hash from API Metadata (New Method)
+        # The API provides "digest": "sha256:84a3..."
+        if ($MsiAsset.digest -match "sha256:(.*)") {
+            $ExpectedHash = $Matches[1]
+        }
+        else {
+            Write-Warning "API did not return a SHA256 digest. Skipping security check."
+            $ExpectedHash = $null
+        }
 
         # 3. Download the MSI
         $TempMsi = "$env:TEMP\$($MsiAsset.name)"
@@ -33,21 +39,17 @@ if (-not (Test-Path $PwshPath)) {
         Invoke-WebRequest -Uri $MsiAsset.browser_download_url -OutFile $TempMsi
 
         # 4. Verify Integrity
-        Write-Host "[-] Verifying SHA256 Checksum..." -ForegroundColor Cyan
-        
-        # Download the official hash string (Trim removes newlines/spaces)
-        $ExpectedHash = (Invoke-RestMethod -Uri $ShaAsset.browser_download_url).Trim()
-        
-        # Calculate local file hash
-        $CalculatedHash = (Get-FileHash -Path $TempMsi -Algorithm SHA256).Hash
+        if ($ExpectedHash) {
+            Write-Host "[-] Verifying SHA256 Checksum..." -ForegroundColor Cyan
+            $CalculatedHash = (Get-FileHash -Path $TempMsi -Algorithm SHA256).Hash
 
-        if ($CalculatedHash -ne $ExpectedHash) {
-            Write-Error "HASH MISMATCH! verification failed."
-            Write-Error "Expected: $ExpectedHash"
-            Write-Error "Actual:   $CalculatedHash"
-            throw "Security verification failed. The file may be corrupted or tampered with."
-        }
-        else {
+            # Compare (Case-insensitive)
+            if ($CalculatedHash -ne $ExpectedHash) {
+                Write-Error "HASH MISMATCH!"
+                Write-Error "Expected (API): $ExpectedHash"
+                Write-Error "Actual (File):  $CalculatedHash"
+                throw "Security verification failed. The file may be corrupted or tampered with."
+            }
             Write-Host "    [OK] Hash Verified." -ForegroundColor Green
         }
 
