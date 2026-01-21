@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Bootstrap script for Intune Autopilot Enrollment via PowerShell 7.
-    Version 3.0 - Fixes Variable Expansion bug using literal strings.
+    Version 4.0 - Adds Dynamic SHA256 Integrity Check.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -14,16 +14,44 @@ $PwshPath = "C:\Program Files\PowerShell\7\pwsh.exe"
 
 if (-not (Test-Path $PwshPath)) {
     Write-Host "[-] PowerShell 7 not found. Fetching latest MSI..." -ForegroundColor Cyan
+    
     try {
+        # Fetch Release Info
         $LatestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
-        $MsiAsset = $LatestRelease.assets | Where-Object { $_.name -like "*-win-x64.msi" } | Select-Object -First 1
         
+        # 1. Find the MSI Asset
+        $MsiAsset = $LatestRelease.assets | Where-Object { $_.name -like "*-win-x64.msi" } | Select-Object -First 1
         if (-not $MsiAsset) { throw "Could not find MSI asset." }
 
+        # 2. Find the SHA256 Asset (It usually has the same name + .sha256)
+        $ShaAsset = $LatestRelease.assets | Where-Object { $_.name -eq "$($MsiAsset.name).sha256" } | Select-Object -First 1
+        if (-not $ShaAsset) { throw "Could not find SHA256 checksum asset." }
+
+        # 3. Download the MSI
         $TempMsi = "$env:TEMP\$($MsiAsset.name)"
         Write-Host "[-] Downloading $($MsiAsset.name)..." -ForegroundColor Cyan
         Invoke-WebRequest -Uri $MsiAsset.browser_download_url -OutFile $TempMsi
 
+        # 4. Verify Integrity
+        Write-Host "[-] Verifying SHA256 Checksum..." -ForegroundColor Cyan
+        
+        # Download the official hash string (Trim removes newlines/spaces)
+        $ExpectedHash = (Invoke-RestMethod -Uri $ShaAsset.browser_download_url).Trim()
+        
+        # Calculate local file hash
+        $CalculatedHash = (Get-FileHash -Path $TempMsi -Algorithm SHA256).Hash
+
+        if ($CalculatedHash -ne $ExpectedHash) {
+            Write-Error "HASH MISMATCH! verification failed."
+            Write-Error "Expected: $ExpectedHash"
+            Write-Error "Actual:   $CalculatedHash"
+            throw "Security verification failed. The file may be corrupted or tampered with."
+        }
+        else {
+            Write-Host "    [OK] Hash Verified." -ForegroundColor Green
+        }
+
+        # 5. Install
         Write-Host "[-] Installing PowerShell 7..." -ForegroundColor Cyan
         Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$TempMsi`" /quiet /norestart" -Wait
     }
@@ -36,8 +64,7 @@ if (-not (Test-Path $PwshPath)) {
 # --- 3. Create the Payload Script for PS7 ---
 $PayloadFile = "$env:TEMP\IntuneEnrollment.ps1"
 
-# IMPORTANT: We use Single Quotes (@') here to prevent PowerShell 5 from 
-# erasing the variables inside the block before writing the file.
+# Use Single Quotes (@') to prevent variable expansion issues
 $PayloadContent = @'
 Write-Host "[-] Configuring PowerShell 7 Environment..." -ForegroundColor Green
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -60,7 +87,6 @@ if (-not $ScriptInfo) {
 }
 
 # 3. Execution (Using Full Path)
-# We construct the full path to ensure it runs even if the PATH var isn't updated in this session
 if ($ScriptInfo) {
     $ScriptPath = "$($ScriptInfo.InstalledLocation)\$ScriptName.ps1"
 
